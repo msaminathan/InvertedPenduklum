@@ -64,6 +64,7 @@ with col1:
     ax.set_aspect('equal')
     ax.grid(True, alpha=0.3)
     ax.axhline(y=0, color='k', linewidth=2)
+    ax.axvline(x=0, color='k', linewidth=2, linestyle='--', alpha=0.7)
     ax.set_xlabel('x (horizontal)', fontsize=12)
     ax.set_ylabel('y (vertical)', fontsize=12)
     ax.set_title('Inverted Double Pendulum System', fontsize=14, fontweight='bold')
@@ -174,4 +175,5 @@ bottom arm angle θ₁, top arm angle θ₂) but only one control input (cart fo
 The control objective is to stabilize the system at the upright position (θ₁ = 0, θ₂ = 0) 
 by manipulating the cart position through applied forces.
 """)
+
 

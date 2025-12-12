@@ -160,3 +160,4 @@ with col2:
     - [Matplotlib Gallery](https://matplotlib.org/stable/gallery/index.html)
     """)
 
+

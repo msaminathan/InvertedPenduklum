@@ -1,8 +1,12 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 from scipy.integrate import odeint
 from scipy.linalg import solve_continuous_are
+import io
+import tempfile
+import os
 
 st.set_page_config(page_title="Visualizations", page_icon="📊", layout="wide")
 
@@ -298,6 +302,9 @@ with tab3:
         ax.plot(var1[0], var2[0], 'go', markersize=8)
         ax.plot(var1[-1], var2[-1], 'ro', markersize=8)
     
+    # Add axes at origin
+    ax.axvline(x=0, color='k', linestyle='--', linewidth=1, alpha=0.5)
+    ax.axhline(y=0, color='k', linestyle='--', linewidth=1, alpha=0.5)
     ax.set_xlabel(plot_var1, fontsize=12)
     ax.set_ylabel(plot_var2, fontsize=12)
     ax.set_title(f'Phase Portrait: {plot_var1} vs {plot_var2}', fontsize=14, fontweight='bold')
@@ -310,15 +317,32 @@ with tab4:
     st.header("Animation")
     
     st.markdown("""
-    Animated visualization of the pendulum motion.
+    Animated visualization of the pendulum motion. Generate an MP4 video of the simulation.
     """)
     
-    # Initial conditions
-    x0_anim = st.slider("Initial x (animation)", -1.0, 1.0, 0.0, 0.01)
-    theta1_0_anim = st.slider("Initial θ₁ (animation, degrees)", -30, 30, 5, 1)
-    theta2_0_anim = st.slider("Initial θ₂ (animation, degrees)", -30, 30, 5, 1)
+    col1, col2 = st.columns(2)
     
-    use_control_anim = st.checkbox("Use LQR Control (animation)", value=True)
+    with col1:
+        # Initial conditions
+        x0_anim = st.slider("Initial x (animation)", -1.0, 1.0, 0.0, 0.01)
+        theta1_0_anim = st.slider("Initial θ₁ (animation, degrees)", -30, 30, 5, 1)
+        theta2_0_anim = st.slider("Initial θ₂ (animation, degrees)", -30, 30, 5, 1)
+        
+        use_control_anim = st.checkbox("Use LQR Control (animation)", value=True)
+        
+        # Animation parameters
+        duration = st.slider("Animation duration (seconds)", 1.0, 10.0, 5.0, 0.5)
+        fps = st.slider("Frames per second", 10, 60, 30)
+    
+    with col2:
+        st.markdown("""
+        ### Animation Settings
+        
+        - **Duration**: Total length of the animation
+        - **FPS**: Frame rate (higher = smoother but larger file)
+        - The animation shows the pendulum motion with cart movement
+        - Vertical dashed line shows initial cart position (t=0)
+        """)
     
     # Convert to radians
     theta1_0_rad_anim = np.deg2rad(theta1_0_anim)
@@ -340,12 +364,126 @@ with tab4:
         A_cl = A
     
     # Simulate
-    t_anim = np.linspace(0, 5, 200)
+    n_points = int(duration * fps)
+    t_anim = np.linspace(0, duration, n_points)
     x_sim_anim = odeint(lambda x, t: A_cl @ x, x0_vec_anim, t_anim)
     
-    # Create animation frames
-    n_frames = st.slider("Number of frames", 10, 200, 50)
-    frame_indices = np.linspace(0, len(t_anim)-1, n_frames, dtype=int)
+    # Store initial cart position (t=0) for reference line
+    x_cart_initial = x0_anim
+    
+    # Calculate x-axis limits based on cart movement with margin (for all frames)
+    x_min = np.min(x_sim_anim[:, 0])
+    x_max = np.max(x_sim_anim[:, 0])
+    x_range = x_max - x_min
+    x_margin = max(0.5, x_range * 0.2)  # 20% margin, minimum 0.5m
+    x_lim_min = x_min - x_margin
+    x_lim_max = x_max + x_margin
+    
+    # Create MP4 animation
+    if st.button("🎬 Generate MP4 Animation"):
+        with st.spinner("Creating animation... This may take a moment."):
+            try:
+                # Create figure for animation
+                fig_anim, ax_anim = plt.subplots(figsize=(10, 8))
+                ax_anim.set_xlim(x_lim_min, x_lim_max)
+                ax_anim.set_ylim(-0.5, 2.5)
+                ax_anim.axhline(y=0, color='k', linewidth=2)
+                ax_anim.axvline(x=x_cart_initial, color='k', linewidth=2, linestyle='--', alpha=0.7, label='Initial position (t=0)')
+                ax_anim.set_xlabel('x (horizontal)', fontsize=12)
+                ax_anim.set_ylabel('y (vertical)', fontsize=12)
+                ax_anim.set_title('Inverted Double Pendulum Animation', fontsize=14, fontweight='bold')
+                ax_anim.grid(True, alpha=0.3)
+                ax_anim.legend()
+                
+                # Initialize plot elements
+                cart_width = 0.2
+                cart_height = 0.15
+                cart_rect = plt.Rectangle((0, 0), cart_width, cart_height, 
+                                          facecolor='gray', edgecolor='black', linewidth=2)
+                ax_anim.add_patch(cart_rect)
+                
+                arm1_line, = ax_anim.plot([], [], 'b-', linewidth=3, label='Bottom Arm')
+                arm2_line, = ax_anim.plot([], [], 'r-', linewidth=3, label='Top Arm')
+                mass1_point, = ax_anim.plot([], [], 'bo', markersize=12, label='m₁')
+                mass2_point, = ax_anim.plot([], [], 'ro', markersize=12, label='m₂')
+                
+                time_text = ax_anim.text(0.02, 0.98, '', transform=ax_anim.transAxes, 
+                                        fontsize=12, verticalalignment='top',
+                                        bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+                
+                def animate(frame):
+                    x_cart = x_sim_anim[frame, 0]
+                    theta1 = x_sim_anim[frame, 1]
+                    theta2 = x_sim_anim[frame, 2]
+                    
+                    x1 = x_cart + L1 * np.sin(theta1)
+                    y1 = L1 * np.cos(theta1)
+                    x2 = x1 + L2 * np.sin(theta1 + theta2)
+                    y2 = y1 + L2 * np.cos(theta1 + theta2)
+                    
+                    # Update cart position
+                    cart_rect.set_xy((x_cart - cart_width/2, -cart_height/2))
+                    
+                    # Update arms
+                    arm1_line.set_data([x_cart, x1], [0, y1])
+                    arm2_line.set_data([x1, x2], [y1, y2])
+                    
+                    # Update masses
+                    mass1_point.set_data([x1], [y1])
+                    mass2_point.set_data([x2], [y2])
+                    
+                    # Update time
+                    time_text.set_text(f't = {t_anim[frame]:.2f} s')
+                    
+                    return cart_rect, arm1_line, arm2_line, mass1_point, mass2_point, time_text
+                
+                # Create animation
+                anim = FuncAnimation(fig_anim, animate, frames=len(t_anim), 
+                                    interval=1000/fps, blit=True, repeat=False)
+                
+                # Save to temporary file
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
+                    tmp_path = tmp_file.name
+                
+                # Save animation
+                writer = FFMpegWriter(fps=fps, bitrate=1800)
+                anim.save(tmp_path, writer=writer, dpi=100)
+                plt.close(fig_anim)
+                
+                # Read the file and provide download
+                with open(tmp_path, 'rb') as f:
+                    video_bytes = f.read()
+                
+                st.success("Animation created successfully!")
+                st.download_button(
+                    label="📥 Download MP4 Animation",
+                    data=video_bytes,
+                    file_name=f"pendulum_animation_{duration}s_{fps}fps.mp4",
+                    mime="video/mp4"
+                )
+                
+                # Clean up
+                os.unlink(tmp_path)
+                
+            except Exception as e:
+                st.error(f"Error creating animation: {str(e)}")
+                st.info("""
+                **Note**: MP4 creation requires FFmpeg to be installed on your system.
+                
+                To install FFmpeg:
+                - **Linux**: `sudo apt-get install ffmpeg` or `sudo yum install ffmpeg`
+                - **macOS**: `brew install ffmpeg`
+                - **Windows**: Download from https://ffmpeg.org/download.html
+                
+                Alternatively, you can view the static frames below.
+                """)
+    
+    st.markdown("---")
+    st.subheader("Static Frames Preview")
+    
+    # Create animation frames preview
+    n_frames_preview = st.slider("Number of preview frames", 4, 16, 8)
+    frame_indices = np.linspace(0, len(t_anim)-1, n_frames_preview, dtype=int)
     
     # Display frames
     cols = st.columns(4)
@@ -362,10 +500,13 @@ with tab4:
             x2 = x1 + L2 * np.sin(theta1 + theta2)
             y2 = y1 + L2 * np.cos(theta1 + theta2)
             
-            ax_frame.set_xlim(-2, 2)
+            # Use consistent x-axis limits for all frames (only x-axis scale increased)
+            ax_frame.set_xlim(x_lim_min, x_lim_max)
             ax_frame.set_ylim(-0.5, 2.5)
-            ax_frame.set_aspect('equal')
+            # Removed 'equal' aspect to allow independent x-axis scaling
             ax_frame.axhline(y=0, color='k', linewidth=2)
+            # Vertical line fixed at initial cart position (t=0) to show relative movement
+            ax_frame.axvline(x=x_cart_initial, color='k', linewidth=2, linestyle='--', alpha=0.7)
             
             # Draw cart
             cart_width = 0.2

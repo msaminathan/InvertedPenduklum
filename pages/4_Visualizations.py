@@ -450,20 +450,18 @@ with tab4:
                 anim.save(tmp_path, writer=writer, dpi=100)
                 plt.close(fig_anim)
                 
-                # Read the file and provide download
+                # Read the file and store in session state
                 with open(tmp_path, 'rb') as f:
                     video_bytes = f.read()
                 
-                st.success("Animation created successfully!")
-                st.download_button(
-                    label="📥 Download MP4 Animation",
-                    data=video_bytes,
-                    file_name=f"pendulum_animation_{duration}s_{fps}fps.mp4",
-                    mime="video/mp4"
-                )
+                # Store video in session state for display
+                st.session_state['animation_video'] = video_bytes
+                st.session_state['animation_filename'] = f"pendulum_animation_{duration}s_{fps}fps.mp4"
                 
-                # Clean up
+                # Clean up temporary file
                 os.unlink(tmp_path)
+                
+                st.success("Animation created successfully!")
                 
             except Exception as e:
                 st.error(f"Error creating animation: {str(e)}")
@@ -477,6 +475,18 @@ with tab4:
                 
                 Alternatively, you can view the static frames below.
                 """)
+    
+    # Display video if it exists in session state
+    if 'animation_video' in st.session_state:
+        st.subheader("📹 Generated Animation")
+        st.video(st.session_state['animation_video'])
+        
+        st.download_button(
+            label="📥 Download MP4 Animation",
+            data=st.session_state['animation_video'],
+            file_name=st.session_state.get('animation_filename', 'pendulum_animation.mp4'),
+            mime="video/mp4"
+        )
     
     st.markdown("---")
     st.subheader("Static Frames Preview")

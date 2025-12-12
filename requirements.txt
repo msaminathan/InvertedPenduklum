@@ -3,3 +3,12 @@ numpy>=1.24.0
 matplotlib>=3.7.0
 scipy>=1.10.0
 sympy>=1.12
+
+# Note: FFmpeg is required for MP4 animation generation but must be installed separately
+# as it is not a Python package. Installation instructions:
+# - Linux: sudo apt-get install ffmpeg or sudo yum install ffmpeg
+# - macOS: brew install ffmpeg
+# - Windows: Download from https://ffmpeg.org/download.html
+
+
+

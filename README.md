@@ -75,6 +75,10 @@ The system has three degrees of freedom (cart position x, bottom arm angle θ₁
 
 - Python 3.8 or higher
 - pip (Python package manager)
+- FFmpeg (required for MP4 animation generation)
+  - **Linux**: `sudo apt-get install ffmpeg` or `sudo yum install ffmpeg`
+  - **macOS**: `brew install ffmpeg`
+  - **Windows**: Download from https://ffmpeg.org/download.html
 
 ### Steps
 
@@ -105,11 +109,16 @@ The system has three degrees of freedom (cart position x, bottom arm angle θ₁
 
 ## Dependencies
 
+### Python Packages
 - **streamlit**: Web application framework
 - **numpy**: Numerical computing
 - **matplotlib**: Plotting and visualization
 - **scipy**: Scientific computing (ODE solvers, LQR)
 - **sympy**: Symbolic mathematics (for equation display)
+
+### System Requirements
+- **FFmpeg**: Required for MP4 animation generation (must be installed separately)
+  - See Prerequisites section above for installation instructions
 
 ## Project Structure
 
@@ -200,4 +209,6 @@ For questions, suggestions, or contributions, please refer to the code repositor
 ---
 
 **Note**: This application is intended for educational purposes. For production control systems, consult with control engineering professionals and perform thorough testing and validation.
+
+
 

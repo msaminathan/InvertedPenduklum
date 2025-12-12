@@ -384,7 +384,7 @@ with tab4:
         with st.spinner("Creating animation... This may take a moment."):
             try:
                 # Create figure for animation
-                fig_anim, ax_anim = plt.subplots(figsize=(5, 4))
+                fig_anim, ax_anim = plt.subplots(figsize=(20, 16))
                 #fig_anim, ax_anim = plt.subplots(figsize=(10, 8))
                 ax_anim.set_xlim(x_lim_min, x_lim_max)
                 ax_anim.set_ylim(-0.5, 2.5)
